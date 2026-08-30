@@ -28,7 +28,7 @@ provider.setCustomParameters({ prompt: 'select_account' });
 // ==========================================
 window.currentUserEmail = null;
 window.currentRole = "user";
-window.SUPER_ADMIN = 'patlapiotrek@gmail.com';
+window.SUPER_ADMIN = 'patlapiotrek@gmail.com', 'baginskip13@gmail.com';
 window.wszystkieOsobyMap = new Map();
 window.konwersacjeMap = new Map();
 
