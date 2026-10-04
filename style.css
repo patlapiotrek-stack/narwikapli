@@ -187,3 +187,66 @@ button:disabled { opacity: .6; cursor: wait; }
     max-height: 24px !important;
 }
 #chat-users-list .user-chat-item:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+
+/* Seven equal columns, even when an event title has no spaces. */
+.cal-grid, .cal-days { min-width: 0; }
+.cal-grid > .cal-cell {
+    min-width: 0; height: 112px; min-height: 0; overflow: hidden;
+    display: flex; flex-direction: column; align-items: stretch; gap: 3px;
+}
+.cal-grid > .cal-cell:hover { transform: none; }
+.cal-grid .cal-cell-date {
+    align-self: flex-start; flex: 0 0 26px; height: 26px; width: 26px;
+    min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 50%;
+    background: transparent; color: var(--text-main); box-shadow: none;
+}
+.cal-grid .cal-event, .cal-grid .cal-more {
+    display: block; flex: 0 0 21px; min-height: 0; height: 21px; min-width: 0;
+    width: 100%; max-width: 100%; margin: 0; padding: 3px 4px; border-radius: 4px;
+    font-size: 10px; line-height: 15px; text-align: left; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; box-shadow: none; gap: 0;
+}
+.cal-grid .cal-more { background: transparent; color: var(--primary); font-weight: 700; }
+.cal-grid button:hover { transform: none; box-shadow: none; }
+.cal-grid button:focus-visible, .home-event:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.home-events h4 { margin: 26px 0 12px; font-size: 16px; color: var(--text-main); }
+.home-event {
+    width: 100%; min-width: 0; padding: 14px; margin-bottom: 10px;
+    border-left: 4px solid var(--primary); display: flex; gap: 12px;
+    align-items: center; text-align: left; color: var(--text-main); font-size: 14px;
+}
+.home-event-date { flex: 0 0 auto; max-width: 110px; font-size: 12px; font-weight: 700; color: var(--primary); }
+.home-event-main { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
+.home-event-main > span { color: var(--text-muted); font-size: 12px; }
+.home-event-open { flex: 0 0 auto; font-size: 12px; color: var(--primary); }
+.event-empty, .mail-help { color: var(--text-muted); font-size: 13px; line-height: 1.6; }
+.event-details-dialog {
+    width: min(92vw, 600px); max-height: 85dvh; overflow-y: auto; margin: auto;
+    padding: 20px; border: 1px solid var(--border-color); border-radius: 20px;
+    background: var(--bg-card); color: var(--text-main); box-shadow: 0 20px 70px rgba(0,0,0,.3);
+}
+.event-details-dialog::backdrop { background: rgba(15,23,42,.75); backdrop-filter: blur(6px); }
+.event-details-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.event-details-header h3 { margin: 0; overflow-wrap: anywhere; }
+.event-details-header button { padding: 8px 12px; min-height: 40px; background: var(--bg-body); color: var(--text-main); }
+.event-detail { margin-top: 18px; padding: 14px; border-left: 4px solid var(--primary); border-radius: 8px; background: var(--bg-body); overflow-wrap: anywhere; }
+.event-detail h4 { font-size: 18px; margin: 0 0 12px; }
+.event-detail h5 { font-size: 13px; margin: 16px 0 6px; }
+.event-detail dl { margin: 0; }
+.event-detail dl > div { margin: 10px 0; }
+.event-detail dt { font-size: 12px; color: var(--text-muted); }
+.event-detail dd { margin: 3px 0 0; font-size: 14px; }
+.event-detail-description { white-space: pre-wrap; line-height: 1.6; margin: 0; font-size: 14px; }
+#event-details-add { margin-top: 18px; width: 100%; }
+#event-details-add[hidden] { display: none; }
+.mail-toggle { display: flex; align-items: center; gap: 10px; padding: 10px 0; font-weight: 700; }
+.mail-toggle input { width: 20px !important; height: 20px !important; margin: 0; }
+.mail-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; font-size: 12px; }
+@media (max-width: 480px) {
+    .cal-wrapper { padding: 10px; }
+    .cal-grid { gap: 3px; }
+    .cal-grid > .cal-cell { height: 108px; padding: 3px; }
+    .home-event { flex-wrap: wrap; gap: 8px; }
+    .home-event-date { flex-basis: 100%; max-width: none; }
+    .mail-options { grid-template-columns: minmax(0, 1fr); }
+}

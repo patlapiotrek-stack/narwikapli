@@ -1,4 +1,6 @@
-import { escapeHtml, jsAttribute, safeUrl, safeColor, validateFile, nextMonth, preferences } from "./security.js?v=20260913-chat-cache-2";
+import { escapeHtml, jsAttribute, safeUrl, safeColor, validateFile, nextMonth, preferences } from "./security.js?v=20261004-calendar-ovh";
+import { renderCalendar, renderHomeEvents, renderEventDetails, eventsForDay, formatEventDate } from './events.js?v=20261004-calendar-ovh';
+import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-functions.js';
 const urlAttribute = value => escapeHtml(safeUrl(value));
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
@@ -22,6 +24,11 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
+const mailFunctions = getFunctions(app, 'europe-west1');
+const getMailConfig = httpsCallable(mailFunctions, 'getOvhMailConfig');
+const saveMailConfig = httpsCallable(mailFunctions, 'saveOvhMailConfig');
+const sendMail = httpsCallable(mailFunctions, 'sendOvhNotification');
+window.wydarzeniaMap = new Map();
 const onSnapshot = (q, next, onError) => firebaseOnSnapshot(q, snapshot => {
     try { next(snapshot); } catch (error) { window.reportError(error); }
 }, error => onError ? onError(error) : window.reportError(error));
@@ -47,22 +54,22 @@ window.currentCalDate = nextMonth(new Date(), 0);
 
 window.isSoftAdminGlobal = false;
 window.isHardAdminGlobal = false;
-window.emailJsConfig = { enabled: false, serviceId: '', templateId: '', publicKey: '', notifications: {} };
-const EMAIL_NOTIFICATION_TYPES = Object.freeze({
+window.mailConfig = { enabled: false, mailbox: '', senderName: 'Narwik Promotion', host: 'smtp.mail.ovh.net', port: 465, notifications: {} };
+const MAIL_NOTIFICATION_TYPES = Object.freeze({
     welcome: 'Nowe konto / powitanie', task: 'Nowe zadanie', role: 'Zmiana roli', request: 'Nowe zapotrzebowanie',
-    idea: 'Nowy pomysł', event: 'Nowe wydarzenie', announcement: 'Ogłoszenie', problem: 'Zgłoszenie problemu', reminder: 'Przypomnienie'
+    idea: 'Nowy pomysł', event: 'Nowe wydarzenie', announcement: 'Ogłoszenie', problem: 'Zgłoszenie problemu', reminder: 'Przypomnienie', other: 'Pozostałe powiadomienia'
 });
-window.emailJsNotificationType = subject => {
+window.mailNotificationType = subject => {
     const value = String(subject || '').toLowerCase();
     if (value.includes('witaj') || value.includes('konto')) return 'welcome';
     if (value.includes('zadanie')) return 'task';
     if (value.includes('rola') || value.includes('uprawnienia')) return 'role';
     if (value.includes('zapotrzebowanie')) return 'request';
     if (value.includes('pomysł')) return 'idea';
+    if (value.includes('przypomnienie')) return 'reminder';
     if (value.includes('wydarzenie')) return 'event';
     if (value.includes('ogłoszenie')) return 'announcement';
     if (value.includes('problem')) return 'problem';
-    if (value.includes('przypomnienie')) return 'reminder';
     return 'other';
 };
 
@@ -217,25 +224,25 @@ window.oznaczWszystkiePowiadomieniaJakoOdczytane = async () => {
 };
 
 window.wczytajKonfiguracjeEmail = async () => {
+    if (!window.isHardAdminGlobal) return;
+    const status = document.getElementById('ovh-mail-status');
     try {
-        const snapshot = await getDoc(doc(db, 'ustawienia', 'emailjs'));
-        if (snapshot.exists()) window.emailJsConfig = { ...window.emailJsConfig, ...snapshot.data(), notifications: snapshot.data().notifications || {} };
+        const result = await getMailConfig();
+        window.mailConfig = { ...window.mailConfig, ...result.data };
+        if (status) status.textContent = window.mailConfig.enabled ? 'Powiadomienia OVH są włączone.' : 'Powiadomienia OVH są wyłączone.';
     } catch (error) {
-        // Konfiguracja EmailJS jest opcjonalna i nie może blokować logowania.
-        if (error?.code === 'permission-denied') console.warn('Konfiguracja EmailJS jest niedostępna; e-maile pozostają wyłączone.');
-        else window.reportError(error, 'konfiguracja EmailJS');
+        window.mailConfig.enabled = false;
+        if (status) status.textContent = 'Usługa poczty nie jest dostępna. Wdróż funkcje Firebase zgodnie z instrukcją konfiguracji.';
     }
-    const options = document.getElementById('emailjs-notification-options');
-    if (options) options.innerHTML = Object.entries(EMAIL_NOTIFICATION_TYPES).map(([key, label]) => `<label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" data-email-type="${key}" style="width:18px!important;height:18px!important;margin:0;"> ${label}</label>`).join('');
-    const enabled = document.getElementById('emailjs-enabled'); if (enabled) enabled.checked = window.emailJsConfig.enabled === true;
-    const service = document.getElementById('emailjs-service-id'); if (service) service.value = window.emailJsConfig.serviceId || '';
-    const template = document.getElementById('emailjs-template-id'); if (template) template.value = window.emailJsConfig.templateId || '';
-    const key = document.getElementById('emailjs-public-key'); if (key) key.value = window.emailJsConfig.publicKey || '';
-    options?.querySelectorAll('[data-email-type]').forEach(el => { el.checked = window.emailJsConfig.notifications?.[el.dataset.emailType] !== false; });
+    const config = window.mailConfig;
+    document.getElementById('ovh-mail-enabled').checked = config.enabled === true;
+    for (const field of ['mailbox', 'senderName', 'host', 'port']) document.getElementById('ovh-mail-' + field).value = config[field];
+    const options = document.getElementById('ovh-mail-notification-options');
+    options.innerHTML = Object.entries(MAIL_NOTIFICATION_TYPES).map(([key, label]) => `<label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" data-email-type="${key}" style="width:18px!important;height:18px!important;margin:0;"> ${label}</label>`).join('');
+    options.querySelectorAll('[data-email-type]').forEach(el => { el.checked = config.notifications?.[el.dataset.emailType] !== false; });
 };
 
-// Jednorazowa, idempotentna migracja starych ról zapisanych pod losowymi ID.
-// Wykonuje ją wyłącznie główny administrator; stare dokumenty pozostają jako kopia.
+
 window.migrujStareRole = async () => {
     if (!isConfiguredHead(window.currentUserEmail)) return;
     try {
@@ -264,45 +271,46 @@ window.migrujStareRole = async () => {
     }
 };
 window.zapiszKonfiguracjeEmail = async () => {
-    if (window.currentRole !== 'head_admin') return window.reportError(new Error('Tylko główny administrator może zmieniać konfigurację e-maili.'));
-    const serviceId = document.getElementById('emailjs-service-id')?.value.trim();
-    const templateId = document.getElementById('emailjs-template-id')?.value.trim();
-    const publicKey = document.getElementById('emailjs-public-key')?.value.trim();
-    if (serviceId.length > 200 || templateId.length > 200 || publicKey.length > 300) return window.reportError(new Error('Konfiguracja EmailJS jest za długa.'));
+    if (window.currentRole !== 'head_admin' || window.mailSettingsSaving) return;
     const notifications = {};
     document.querySelectorAll('[data-email-type]').forEach(el => { notifications[el.dataset.emailType] = el.checked; });
+    const config = { enabled: document.getElementById('ovh-mail-enabled').checked, notifications };
+    for (const field of ['mailbox', 'senderName', 'host']) config[field] = document.getElementById('ovh-mail-' + field).value.trim();
+    config.port = Number(document.getElementById('ovh-mail-port').value);
+    window.mailSettingsSaving = true;
     try {
-        const config = { enabled: document.getElementById('emailjs-enabled')?.checked === true, serviceId, templateId, publicKey, notifications, updatedBy: window.currentUserEmail, updatedAt: new Date().toISOString() };
-        await setDoc(doc(db, 'ustawienia', 'emailjs'), config, { merge: true });
-        window.emailJsConfig = config;
-        document.getElementById('emailjs-status').textContent = 'Zapisano konfigurację.';
-        window.pokazCustomAlert('Konfiguracja e-maili zapisana.', 'success');
-    } catch (error) { window.reportError(error); }
+        const result = await saveMailConfig(config);
+        window.mailConfig = result.data;
+        document.getElementById('ovh-mail-status').textContent = 'Zapisano ustawienia skrzynki OVH.';
+        window.pokazCustomAlert('Ustawienia poczty zapisane.', 'success');
+    } catch (error) { window.reportError(error, 'ustawienia poczty OVH'); }
+    finally { window.mailSettingsSaving = false; }
 };
-window.wyslijPowiadomienieEmail = async (odbiorca, temat, wiadomosc, typ = window.emailJsNotificationType(temat)) => {
-    const config = window.emailJsConfig;
-    if (!config.enabled || !config.serviceId || !config.templateId || !config.publicKey || config.notifications?.[typ] === false) return false;
-    if (!window.isHardAdminGlobal || !window.currentUserEmail) return false;
-    if (!window.emailjs?.send) return window.reportError(new Error('EmailJS nie został załadowany. Odśwież aplikację.'));
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(odbiorca || ''))) return false;
+window.wyslijPowiadomienieEmail = async (odbiorca, temat, wiadomosc, typ = window.mailNotificationType(temat)) => {
+    const config = window.mailConfig;
+    if (!config.enabled || config.notifications?.[typ] === false || !window.isHardAdminGlobal || !window.currentUserEmail) return false;
     try {
-        return await window.emailjs.send(config.serviceId, config.templateId, { to_email: odbiorca, subject: temat, message: wiadomosc, from_email: window.currentUserEmail }, config.publicKey);
-    } catch (error) { window.reportError(new Error('Wysyłka e-maila nie powiodła się.')); return false; }
+        const result = await sendMail({ to: odbiorca, subject: temat, message: wiadomosc, type: typ });
+        return result.data.sent === true;
+    } catch (error) { window.reportError(error, 'wysyłka powiadomienia OVH'); return false; }
 };
-window.testujEmailJS = async () => {
-    const recipient = window.currentUserEmail;
-    if (!recipient) return window.reportError(new Error('Zaloguj się jako administrator.'));
-    const result = await window.wyslijPowiadomienieEmail(recipient, 'Test konfiguracji EmailJS', 'To jest test konfiguracji powiadomień aplikacji.', 'other');
-    if (result) window.pokazCustomAlert('Wysłano wiadomość testową na Twój adres.', 'success');
-    else window.reportError(new Error('Test nie został wysłany. Włącz EmailJS globalnie i rodzaj „inne” lub użyj „Wyślij test” po zapisaniu konfiguracji.'));
+window.testujPoczteOvh = async () => {
+    if (window.currentRole !== 'head_admin' || window.mailTestSending) return;
+    window.mailTestSending = true;
+    try {
+        const result = await sendMail({ test: true });
+        if (result.data.sent) window.pokazCustomAlert('Wysłano wiadomość testową na Twój adres.', 'success');
+    } catch (error) { window.reportError(error, 'test poczty OVH'); }
+    finally { window.mailTestSending = false; }
 };
+
 
 window.wyslijPrzypomnienie = async (eventId) => {
     try {
         const d = await getDoc(doc(db, "wydarzenia", eventId)); if(!d.exists()) return; const x = d.data();
         if(!x.osoby || x.osoby.length === 0) { window.pokazCustomAlert("Brak przypisanych osób.", "error"); return; }
         window.pokazCustomAlert("Wysyłam przypomnienia w aplikacji...", "info");
-        for(let e of x.osoby) { await window.wyslijPowiadomienieWAppce(e, `🔔 PRZYPOMNIENIE: ${x.nazwa}`, `Przypominamy o wydarzeniu: ${x.nazwa}.\nKiedy: ${x.start}\nGdzie: ${x.lokacja || 'Brak'}`); }
+        for(let e of x.osoby || []) { await window.wyslijPowiadomienieEmail(e, `Przypomnienie: ${x.nazwa}`, `Kiedy: ${x.start}\nGdzie: ${x.lokacja || 'Brak'}`, 'reminder'); await window.wyslijPowiadomienieWAppce(e, `🔔 PRZYPOMNIENIE: ${x.nazwa}`, `Przypominamy o wydarzeniu: ${x.nazwa}.\nKiedy: ${x.start}\nGdzie: ${x.lokacja || 'Brak'}`); }
         window.zapiszDoDziennika(`Wysłano przypomnienie w aplikacji o wydarzeniu: ${x.nazwa}`);
         window.pokazCustomAlert("Przypomnienia wysłano w aplikacji.", "success");
     } catch(err) { window.pokazCustomAlert("Błąd: " + err.message, "error"); }
@@ -791,52 +799,40 @@ window.zmienMiesiacKalendarza = (przesuniecie) => {
     window.pobierzWszystko(false);
 };
 
-window.rysujSiatkeKalendarza = (wydarzeniaZBazy) => {
+window.rysujSiatkeKalendarza = events => {
     const grid = document.getElementById('cal-grid');
     const title = document.getElementById('cal-month-title');
-    if(!grid || !title) return;
-
-    const rok = window.currentCalDate.getFullYear();
-    const miesiac = window.currentCalDate.getMonth();
-
-    const nazwyMiesiecy = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"];
-    title.textContent = `${nazwyMiesiecy[miesiac]} ${rok}`;
-
-    grid.innerHTML = '';
-
-    const pierwszyDzien = new Date(rok, miesiac, 1).getDay();
-    let pusteDniNaPoczatku = pierwszyDzien === 0 ? 6 : pierwszyDzien - 1;
-    const dniWMiesiacu = new Date(rok, miesiac + 1, 0).getDate();
-
-    for (let i = 0; i < pusteDniNaPoczatku; i++) {
-        grid.innerHTML += `<div class="cal-cell cal-cell-empty"></div>`;
-    }
-
-    const dzisiaj = new Date();
-    for (let dzien = 1; dzien <= dniWMiesiacu; dzien++) {
-        const aktualnaDataString = `${rok}-${String(miesiac + 1).padStart(2, '0')}-${String(dzien).padStart(2, '0')}`;
-
-        let klasaDzisiaj = '';
-        if(rok === dzisiaj.getFullYear() && miesiac === dzisiaj.getMonth() && dzien === dzisiaj.getDate()) {
-            klasaDzisiaj = 'today';
-        }
-
-        let wydHtml = '';
-        wydarzeniaZBazy.forEach(w => {
-            if(!String(w.nazwa || '').startsWith('[ZADANIE]') && w.start === aktualnaDataString) {
-                const color = safeColor(w.color);
-                wydHtml += `<div class="cal-event" style="background:${escapeHtml(color)}" title="${escapeHtml(w.nazwa)}">${escapeHtml(w.nazwa)}</div>`;
-            }
-        });
-
-        grid.innerHTML += `
-            <div class="cal-cell ${escapeHtml(klasaDzisiaj)}" onclick="window.otworzWydarzenieDlaDaty('${jsAttribute(aktualnaDataString)}')">
-                <div class="cal-cell-date">${escapeHtml(dzien)}</div>
-                ${wydHtml}
-            </div>
-        `;
-    }
+    if (!grid || !title) return;
+    title.textContent = window.currentCalDate.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+    grid.innerHTML = renderCalendar(events, window.currentCalDate);
 };
+
+window.otworzSzczegolyWydarzenia = id => {
+    const event = window.wydarzeniaMap.get(id);
+    if (!event) return window.pokazCustomAlert('Wydarzenie nie jest już dostępne. Odśwież kalendarz.', 'error');
+    window.pokazSzczegolyWydarzen([event], 'Szczegóły wydarzenia');
+};
+window.pokazSzczegolyWydarzen = (events, title, day = '') => {
+    document.getElementById('event-details-title').textContent = title;
+    document.getElementById('event-details-content').innerHTML = events.map(event => renderEventDetails(event, window.getPersonNameText)).join('') || '<p class="event-empty">Brak wydarzeń w tym dniu.</p>';
+    const add = document.getElementById('event-details-add');
+    add.hidden = !day || !window.isSoftAdminGlobal;
+    add.dataset.day = day;
+    const dialog = document.getElementById('event-details-dialog');
+    if (!dialog.open) dialog.showModal();
+};
+document.addEventListener('click', event => {
+    const detail = event.target.closest('[data-event-id]');
+    if (detail) return window.otworzSzczegolyWydarzenia(detail.dataset.eventId);
+    const day = event.target.closest('#cal-grid [data-calendar-day]');
+    if (day) window.otworzWydarzenieDlaDaty(day.dataset.calendarDay);
+});
+document.getElementById('event-details-add').addEventListener('click', event => {
+    const day = event.currentTarget.dataset.day;
+    document.getElementById('event-details-dialog').close();
+    window.otworzNoweWydarzenieDlaDaty(day);
+});
+
 
 // ==========================================
 // 9. GŁÓWNY SILNIK (POBIERANIE DANYCH)
@@ -848,7 +844,7 @@ window.pobierzWszystko = async function(cl = false) {
     if (!refreshUser) return;
     let pH = '';
     let zH = ''; let bzH = ''; let gH = ''; let kH = ''; let zH2 = ''; let aW = '';
-    let lW = 0, lZ = 0, wD = 0;
+    let lW = 0, lZ = 0;
 
     const isHeadAdmin = window.currentRole === 'head_admin' || isConfiguredHead(window.currentUserEmail);
     const isHardAdmin = isHeadAdmin || window.currentRole === 'admin' || window.currentRole === 'zarzad_sm';
@@ -965,13 +961,13 @@ window.pobierzWszystko = async function(cl = false) {
         });
         const galL = document.getElementById('galeria-lista'); if(galL) galL.innerHTML = gH;
 
-        aW = `<h4 style="margin-top:30px;margin-bottom:12px;color:var(--text-main);font-size:16px;font-weight:700;"><i class="fas fa-calendar-check" style="color:var(--primary);"></i> Nadchodzące spotkania</h4>`;
-        const dz = new Date(); dz.setHours(0,0,0,0);
 
         let wydArr = [];
         if(eS.forEach) { eS.forEach(d => { wydArr.push({...d.data(), id: d.id}); }); }
 
+        window.wydarzeniaMap = new Map(wydArr.map(event => [event.id, event]));
         window.rysujSiatkeKalendarza(wydArr);
+        aW = renderHomeEvents(wydArr);
 
         let kTodo='', kProg='', kReview='', kDone='', cT=0, cP=0, cR=0, cD=0;
         wydArr.sort((a,b) => { if(a.start === "Oczekuje" || a.start==="W trakcie" || a.start==="Wykonane") return -1; if(b.start === "Oczekuje") return 1; return new Date(a.start) - new Date(b.start); });
@@ -985,14 +981,8 @@ window.pobierzWszystko = async function(cl = false) {
 
             if(it){ if(iaMe) lZ++; } else {
                 lW++;
-                if(x.start !== "Brak daty" && x.start !== "Do zrobienia" && x.start !== "Oczekuje" && x.start !== "W trakcie" && x.start !== "Wykonane"){
-                    const dw = new Date(x.start);
-                    if(!isNaN(dw.getTime()) && dw >= dz && wD < 3){
-                        const evColor = safeColor(x.color);
-                        aW += `<div class="board-card" style="padding:14px;margin-bottom:10px;font-size:14px;border-left:4px solid ${escapeHtml(evColor)};display:flex;align-items:center;gap:10px;"><div style="background:var(--border-color);color:var(--primary);padding:8px 12px;border-radius:8px;font-weight:bold;font-size:13px;">${escapeHtml(x.start)}</div><div style="font-weight:600;color:var(--text-main);">${escapeHtml(x.nazwa)}</div></div>`; wD++;
-                    }
-                }
             }
+
 
             let ab = '';
             if(isHardAdmin){
@@ -1151,7 +1141,6 @@ window.pobierzWszystko = async function(cl = false) {
         const pc = document.getElementById('pulpit-lista');
         if(pc){
             if(!pH && window.currentUserEmail) pH = `<div class="board-card" style="padding:20px;text-align:center;border:2px solid var(--success);background:transparent;"><i class="fas fa-check-circle" style="font-size:30px;color:var(--success);margin-bottom:10px;"></i><h3 style="color:var(--success);margin:0;">Wszystko na bieżąco!</h3><p style="color:var(--text-muted);font-size:14px;">Brak oczekujących zadań.</p></div>`;
-            if(wD === 0) aW += `<p style="font-size:14px;color:var(--text-muted);padding:10px;">Brak zaplanowanych wydarzeń na najbliższe dni.</p>`;
             pc.innerHTML = pH + aW;
         }
 
@@ -1303,6 +1292,9 @@ onAuthStateChanged(auth, async u => {
     } else {
         ++refreshGeneration;
         window.currentUserEmail = null; window.currentRole = "user";
+        window.wydarzeniaMap.clear();
+        window.mailConfig.enabled = false;
+        document.getElementById('event-details-dialog').close();
         window.isSoftAdminGlobal = false; window.isHardAdminGlobal = false;
         clearInterval(window.presenceInterval); window.presenceInterval = null;
         if (window.unsubscribeChat) { window.unsubscribeChat(); window.unsubscribeChat = null; }
@@ -1345,7 +1337,11 @@ window.rozpocznijLogowanie = async () => {
     } finally { btn.disabled = false; btn.innerHTML = '<i class="fab fa-google" style="font-size:20px;"></i> Zaloguj przez Google'; }
 };
 
-window.otworzWydarzenieDlaDaty = (dataStr) => {
+window.otworzWydarzenieDlaDaty = dataStr => {
+    const events = eventsForDay([...window.wydarzeniaMap.values()], dataStr);
+    window.pokazSzczegolyWydarzen(events, formatEventDate(dataStr), dataStr);
+};
+window.otworzNoweWydarzenieDlaDaty = (dataStr) => {
     if (!window.isSoftAdminGlobal) {
         window.pokazCustomAlert("Tylko moderatorzy i administratorzy mogą dodawać wydarzenia.", "error");
         return;
@@ -1357,6 +1353,7 @@ window.otworzWydarzenieDlaDaty = (dataStr) => {
     document.getElementById('ev-desc').value = '';
     document.getElementById('ev-location').value = '';
     window.editWydarzenieId = null;
+    document.querySelectorAll('#ev-color-picker .color-dot').forEach(dot => dot.classList.toggle('active', dot.dataset.color === 'primary'));
     document.querySelectorAll('.event-user-cb').forEach(cb => cb.checked = false);
     document.getElementById('modal-event').style.display = 'flex';
 };
@@ -1392,7 +1389,10 @@ window.zapiszWydarzeniePro = async () => {
             window.editWydarzenieId = null;
         } else {
             await addDoc(collection(db, "wydarzenia"), { nazwa: t, opis: d, start: s, lokacja: l, osoby: os, color: kolor, status: "Oczekuje", przypomnienieWyslane: false });
-            os.forEach(em => window.wyslijPowiadomienieWAppce(em, "Nowe Wydarzenie", `Zostałeś przydzielony do: ${t}`));
+            for (const em of os) {
+                await window.wyslijPowiadomienieWAppce(em, 'Nowe Wydarzenie', `Zostałeś przydzielony do: ${t}`);
+                await window.wyslijPowiadomienieEmail(em, 'Nowe wydarzenie', `${t}\nKiedy: ${s}\nGdzie: ${l || 'Do ustalenia'}\n${d || ''}`, 'event');
+            }
         }
 
         document.getElementById('modal-event').style.display = 'none';

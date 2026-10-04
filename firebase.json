@@ -1,0 +1,10 @@
+{
+  "functions": [{ "source": "functions", "codebase": "narwik-mail", "runtime": "nodejs22", "ignore": ["node_modules", ".git", "test", "*.log", ".env*", ".secret*"] }],
+  "hosting": {
+    "site": "narwikpromotionapp",
+    "public": ".",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "functions/**", "tests/**", "*.md", "CZYTAJ-MNIE.txt", "package*.json"],
+    "headers": [{ "source": "**/*.@(html|js|css)", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }],
+    "rewrites": [{ "source": "**", "destination": "/index.html" }]
+  }
+}

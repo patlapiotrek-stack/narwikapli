@@ -1,39 +1,31 @@
-Narwik Promotion — kopia plików Firebase Hosting
+Narwik Promotion — kod aplikacji
 
-Źródło: https://narwikpromotionapp.firebaseapp.com/
-Pobrano: 4 października 2026 r.
+Kod odzyskano 4 października 2026 r. z publicznego Firebase Hosting:
+https://narwikpromotionapp.firebaseapp.com/
+Następnie dodano poprawki kalendarza, szczegóły wydarzeń na pulpicie
+oraz powiadomienia wysyłane przez SMTP OVH za pomocą funkcji Firebase.
 
-ZAWARTOŚĆ
-index.html — strona aplikacji i część stylów
-style.css — dodatkowe style
+PLIKI STRONY
+index.html — interfejs i część stylów
+style.css — style
 app.js — główny kod aplikacji
+events.js — kalendarz, wydarzenia na pulpicie i szczegóły
 ui.js — obsługa interfejsu
-security.js — funkcje pomocnicze importowane przez app.js
-Big.png — grafika aplikacji
+security.js — funkcje pomocnicze
+Big.png — grafika
 
-Te sześć plików pobrano z publicznego hostingu bez zmian w treści.
-Kod JavaScript jest czytelny i można go edytować.
+POCZTA I WDRAŻANIE
+functions/ — funkcje Firebase do bezpośredniej wysyłki SMTP OVH
+firebase.json i .firebaserc — konfiguracja wdrażania do narwikpromotionapp
+POCZTA-OVH.md — instrukcja konfiguracji skrzynki i sekretu z hasłem
 
 URUCHOMIENIE
-Rozpakuj całe archiwum. Otwórz folder w edytorze kodu i udostępnij go
-przez lokalny serwer HTTP. Moduły JavaScript mogą nie działać po otwarciu
-index.html samym dwuklikiem.
+Udostępnij folder przez lokalny serwer HTTP. Biblioteki Firebase, ikony,
+fonty i awatary są ładowane z internetu. Logowanie lokalnej kopii może
+wymagać dopuszczenia jej domeny w Firebase.
 
-Potrzebne jest połączenie z internetem: aplikacja korzysta z bibliotek
-Firebase, EmailJS, ikon, fontów i awatarów ładowanych z zewnętrznych usług.
-Logowanie lokalnej kopii może wymagać dopuszczenia domeny w Firebase.
+Zachowano połączenie z istniejącym projektem Firebase. Baza danych,
+użytkownicy i reguły dostępu pozostają w projekcie. Konfiguracja wdrażania
+nie zastępuje reguł Firestore ani Storage.
 
-ZAKRES KOPII
-To kopia plików aplikacji dostępnych z podanego adresu. Nie obejmuje danych
-Firestore, kont użytkowników, plików przesłanych przez użytkowników,
-reguł dostępu, ustawień projektu ani pierwotnej konfiguracji wdrażania.
-Nie jest to eksport całego projektu z konsoli Firebase.
-
-Zachowano konfigurację połączenia z istniejącym projektem Firebase.
-Uruchomiona kopia może odczytywać lub zmieniać jego dane zgodnie
-z uprawnieniami zalogowanego użytkownika i regułami projektu.
-
-WERYFIKACJA
-Sprawdzono składnię trzech plików JavaScript, obecność lokalnych zależności
-wskazanych w HTML i importach oraz format grafiki PNG. Nie logowano się
-do aplikacji i nie sprawdzano działania operacji na bazie danych.
+Testy: node --test tests/*.test.mjs functions/test/*.test.cjs
