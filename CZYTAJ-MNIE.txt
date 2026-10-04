@@ -1,0 +1,39 @@
+Narwik Promotion — kopia plików Firebase Hosting
+
+Źródło: https://narwikpromotionapp.firebaseapp.com/
+Pobrano: 4 października 2026 r.
+
+ZAWARTOŚĆ
+index.html — strona aplikacji i część stylów
+style.css — dodatkowe style
+app.js — główny kod aplikacji
+ui.js — obsługa interfejsu
+security.js — funkcje pomocnicze importowane przez app.js
+Big.png — grafika aplikacji
+
+Te sześć plików pobrano z publicznego hostingu bez zmian w treści.
+Kod JavaScript jest czytelny i można go edytować.
+
+URUCHOMIENIE
+Rozpakuj całe archiwum. Otwórz folder w edytorze kodu i udostępnij go
+przez lokalny serwer HTTP. Moduły JavaScript mogą nie działać po otwarciu
+index.html samym dwuklikiem.
+
+Potrzebne jest połączenie z internetem: aplikacja korzysta z bibliotek
+Firebase, EmailJS, ikon, fontów i awatarów ładowanych z zewnętrznych usług.
+Logowanie lokalnej kopii może wymagać dopuszczenia domeny w Firebase.
+
+ZAKRES KOPII
+To kopia plików aplikacji dostępnych z podanego adresu. Nie obejmuje danych
+Firestore, kont użytkowników, plików przesłanych przez użytkowników,
+reguł dostępu, ustawień projektu ani pierwotnej konfiguracji wdrażania.
+Nie jest to eksport całego projektu z konsoli Firebase.
+
+Zachowano konfigurację połączenia z istniejącym projektem Firebase.
+Uruchomiona kopia może odczytywać lub zmieniać jego dane zgodnie
+z uprawnieniami zalogowanego użytkownika i regułami projektu.
+
+WERYFIKACJA
+Sprawdzono składnię trzech plików JavaScript, obecność lokalnych zależności
+wskazanych w HTML i importach oraz format grafiki PNG. Nie logowano się
+do aplikacji i nie sprawdzano działania operacji na bazie danych.
